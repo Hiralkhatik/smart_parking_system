@@ -1,0 +1,110 @@
+#include <Servo.h>
+
+Servo barrier;
+const int irEntry = 2;
+const int irSlot1 = 3;
+const int irSlot2 = 4;
+
+int entryDetected = 0;
+int slot1Occupied = 0;
+int slot2Occupied = 0;
+
+int lastSlot1State = HIGH;
+int lastSlot2State = HIGH;
+
+unsigned long startTime1 = 0;
+unsigned long startTime2 = 0;
+bool slot1Charged = false;
+bool slot2Charged = false;
+
+void setup() {
+  barrier.attach(9);
+  pinMode(irEntry, INPUT);
+  pinMode(irSlot1, INPUT);
+  pinMode(irSlot2, INPUT);
+  Serial.begin(9600);
+  barrier.write(0); // Barrier down
+}
+
+void loop() {
+  entryDetected = digitalRead(irEntry);
+  slot1Occupied = digitalRead(irSlot1);
+  slot2Occupied = digitalRead(irSlot2);
+
+  // Show slot status only when it changes
+  if (slot1Occupied != lastSlot1State) {
+    if (slot1Occupied == LOW) {
+      Serial.println("Slot 1: Unvacant (Car parked)");
+    } else {
+      Serial.println("Slot 1: Vacant");
+    }
+    lastSlot1State = slot1Occupied;
+  }
+
+  if (slot2Occupied != lastSlot2State) {
+    if (slot2Occupied == LOW) {
+      Serial.println("Slot 2: Unvacant (Car parked)");
+    } else {
+      Serial.println("Slot 2: Vacant");
+    }
+    lastSlot2State = slot2Occupied;
+  }
+
+  // Entry logic
+  if (entryDetected == LOW) {
+    if (slot1Occupied == HIGH || slot2Occupied == HIGH) {
+      Serial.println("Vacant slot available. Opening barrier...");
+      openBarrier();
+      delay(5000);
+      closeBarrier();
+    } else {
+      Serial.println("All slots occupied. Entry denied.");
+    }
+
+    while (digitalRead(irEntry) == LOW); // Wait until car leaves entry sensor
+  }
+
+  // Slot 1 parking tracking
+  if (slot1Occupied == LOW && startTime1 == 0) {
+    startTime1 = millis();
+    slot1Charged = false;
+  }
+
+  if (slot1Occupied == HIGH && startTime1 != 0 && !slot1Charged) {
+    unsigned long endTime1 = millis();
+    unsigned long duration = (endTime1 - startTime1) / 1000;
+    Serial.print("Vehicle left Slot 1. Duration: ");
+    Serial.print(duration);
+    Serial.print("s. Amount: Rs ");
+    Serial.println(duration);
+    startTime1 = 0;
+    slot1Charged = true;
+  }
+
+  // Slot 2 parking tracking
+  if (slot2Occupied == LOW && startTime2 == 0) {
+    startTime2 = millis();
+    slot2Charged = false;
+  }
+
+  if (slot2Occupied == HIGH && startTime2 != 0 && !slot2Charged) {
+    unsigned long endTime2 = millis();
+    unsigned long duration = (endTime2 - startTime2) / 1000;
+    Serial.print("Vehicle left Slot 2. Duration: ");
+    Serial.print(duration);
+    Serial.print("s. Amount: Rs ");
+    Serial.println(duration);
+    startTime2 = 0;
+    slot2Charged = true;
+  }
+}
+
+void openBarrier() {
+  barrier.write(90); // Adjust angle if needed
+  Serial.println("Barrier Opened.");
+}
+
+void closeBarrier() {
+  barrier.write(0); 
+  Serial.println("Barrier Closed.");
+}
